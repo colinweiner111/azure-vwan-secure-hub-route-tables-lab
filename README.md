@@ -63,8 +63,8 @@ The subscription must have these resource providers registered:
 ### Clone the Repository
 
 ```powershell
-git clone https://github.com/colinweiner111/azure-vwan-secure-hub-lab.git
-cd azure-vwan-secure-hub-lab
+git clone https://github.com/colinweiner111/azure-vwan-secure-hub-route-tables-lab.git
+cd azure-vwan-secure-hub-route-tables-lab
 ```
 
 ## Deployment
