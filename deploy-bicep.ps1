@@ -101,6 +101,24 @@ if ($resourceGroupExists -eq 'true') {
     }
 
     foreach ($virtualHubName in $virtualHubNames) {
+        $virtualHubAddressPrefix = az network vhub show `
+            --resource-group $ResourceGroupName `
+            --name $virtualHubName `
+            --subscription $SubscriptionId `
+            --query 'addressPrefix' `
+            --output tsv
+
+        if ($LASTEXITCODE -ne 0 -or !$virtualHubAddressPrefix) {
+            Write-Error "Unable to inspect the address prefix for virtual hub '$virtualHubName'."
+            exit 1
+        }
+
+        $prefixLength = [int]($virtualHubAddressPrefix -split '/')[1]
+        if ($prefixLength -gt 22) {
+            Write-Error "Virtual hub '$virtualHubName' uses '$virtualHubAddressPrefix'. Azure Firewall requires a /22 or larger virtual hub address space, and hub address prefixes cannot be changed. Use a fresh resource group."
+            exit 1
+        }
+
         $routingIntents = @(
             az network vhub routing-intent list `
                 --resource-group $ResourceGroupName `

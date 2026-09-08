@@ -19,7 +19,7 @@ resource hub1 'Microsoft.Network/virtualHubs@2023-11-01' = {
   name: hub1Name
   location: location1
   properties: {
-    addressPrefix: '192.168.1.0/24'
+    addressPrefix: '192.168.0.0/22'
     virtualWan: {
       id: vwan.id
     }
@@ -32,7 +32,7 @@ resource hub2 'Microsoft.Network/virtualHubs@2023-11-01' = {
   name: hub2Name
   location: location2
   properties: {
-    addressPrefix: '192.168.2.0/24'
+    addressPrefix: '192.168.4.0/22'
     virtualWan: {
       id: vwan.id
     }

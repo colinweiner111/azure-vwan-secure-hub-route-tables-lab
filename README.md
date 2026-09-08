@@ -58,6 +58,8 @@ The subscription must have these resource providers registered:
 - `Microsoft.OperationalInsights`
 - `Microsoft.Insights`
 
+Each virtual hub uses a `/22` address space, the minimum size required for Azure Firewall in Virtual WAN. Virtual hub address prefixes can't be changed after creation, so an older deployment with `/24` hubs must be deleted and recreated.
+
 ## Getting Started
 
 ### Clone the Repository
