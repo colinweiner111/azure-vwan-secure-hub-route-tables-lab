@@ -86,6 +86,9 @@ module firewall 'modules/firewall.bicep' = {
     hub2Id: network.outputs.hub2Id
     firewallSku: firewallSku
   }
+  dependsOn: [
+    vpn
+  ]
 }
 
 // Virtual hub route tables and spoke connections
@@ -117,8 +120,8 @@ module vpn 'modules/vpn.bicep' = {
     branchVnetId: network.outputs.branchVnetId
     hub1Id: network.outputs.hub1Id
     hub2Id: network.outputs.hub2Id
-    hub1DefaultRouteTableId: routing.outputs.hub1DefaultRouteTableId
-    hub2DefaultRouteTableId: routing.outputs.hub2DefaultRouteTableId
+    hub1DefaultRouteTableId: '${network.outputs.hub1Id}/hubRouteTables/defaultRouteTable'
+    hub2DefaultRouteTableId: '${network.outputs.hub2Id}/hubRouteTables/defaultRouteTable'
     vpnSharedKey: vpnSharedKey
   }
 }
