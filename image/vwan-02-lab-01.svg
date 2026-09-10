@@ -20,9 +20,9 @@
     stroke-linejoin="round"
   >
     <text x="215" y="455" fill="#2878c8">inspectedRouteTable</text>
-    <text x="680" y="455" fill="#8a3db0">defaultRouteTable</text>
+    <text x="680" y="455" fill="#8a3db0">internetOnlyRouteTable</text>
     <text x="1820" y="455" fill="#2878c8">inspectedRouteTable</text>
-    <text x="2480" y="455" fill="#8a3db0">defaultRouteTable</text>
+    <text x="2480" y="455" fill="#8a3db0">internetOnlyRouteTable</text>
     <text x="270" y="1040" fill="#107c10">privateOnlyRouteTable</text>
     <text x="830" y="1050" fill="#8a3db0">defaultRouteTable</text>
     <text x="1880" y="1040" fill="#8a3db0">defaultRouteTable</text>
