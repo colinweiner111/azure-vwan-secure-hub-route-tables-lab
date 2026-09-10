@@ -148,7 +148,7 @@ resource hub1Spoke2Connection 'Microsoft.Network/virtualHubs/hubVirtualNetworkCo
     enableInternetSecurity: true
     routingConfiguration: {
       associatedRouteTable: {
-        id: hub1InspectedRouteTable.id
+        id: hub1DefaultRouteTable.id
       }
       propagatedRouteTables: {
         labels: [
@@ -200,7 +200,7 @@ resource hub2Spoke2Connection 'Microsoft.Network/virtualHubs/hubVirtualNetworkCo
     enableInternetSecurity: true
     routingConfiguration: {
       associatedRouteTable: {
-        id: hub2InspectedRouteTable.id
+        id: hub2DefaultRouteTable.id
       }
       propagatedRouteTables: {
         labels: [

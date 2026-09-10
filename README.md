@@ -20,13 +20,16 @@ Both hubs also use their Azure-provided `defaultRouteTable`; the template refere
 
 | Connection | Associated route table | Propagates to | Internet security |
 |---|---|---|---|
-| Spoke VNets | `inspectedRouteTable` | `defaultRouteTable` | Enabled |
+| Spoke 1 VNets | `inspectedRouteTable` | `defaultRouteTable` | Enabled |
+| Spoke 2 VNets | `defaultRouteTable` | `defaultRouteTable` | Enabled |
 | Branch VPN | `defaultRouteTable` | `defaultRouteTable` | Enabled |
 | Bastion VNet | `privateOnlyRouteTable` in Hub 1 | `defaultRouteTable` | Disabled |
 
-Azure requires branch VPN connections to associate with the built-in `defaultRouteTable`; custom route-table association is supported for VNet connections but not branches. The Bastion-specific table sends private traffic through Hub 1 Azure Firewall but has no `0.0.0.0/0` route. This preserves Bastion's required direct control-plane internet access. Connected VNet and VPN prefixes propagate to the built-in default route tables.
+Azure requires branch VPN connections to associate with the built-in `defaultRouteTable`; custom route-table association is supported for VNet connections but not branches. Spoke 2 in each hub also associates with `defaultRouteTable`, so traffic originating there follows learned private routes directly instead of the RFC 1918 static routes through Azure Firewall. Internet security remains enabled on those connections. This is symmetric for peers that also use `defaultRouteTable`; Spoke 2-to-Spoke 1 flows can still be asymmetric because Spoke 1 returns private traffic through `inspectedRouteTable`. The Bastion-specific table sends private traffic through Hub 1 Azure Firewall but has no `0.0.0.0/0` route. This preserves Bastion's required direct control-plane internet access. Connected VNet and VPN prefixes propagate to the built-in default route tables.
 
-This explicit route-table design has an important boundary: it does not provide symmetric Azure Firewall inspection for branch-initiated or inter-hub private traffic. Branch traffic enters through `defaultRouteTable`, while spoke return traffic uses `inspectedRouteTable`; the resulting asymmetric path is dropped by the stateful firewall. Microsoft documents routing intent as the only supported mechanism for inter-hub inspection through security appliances. Use the [upstream routing-intent design](https://github.com/dmauser/azure-virtualwan/tree/main/svh-ri-intra-region) when those flows are required.
+In practical terms, private traffic from either Spoke 2 to the branch/on-premises network bypasses Azure Firewall in both hubs. In the validated deployment, `enableInternetSecurity` alone did not steer Spoke 2 internet egress through Azure Firewall while those connections were associated with `defaultRouteTable`; their observed public egress addresses differed from the hub firewall addresses. Spoke 1 private and internet traffic uses `inspectedRouteTable` and traverses the local hub firewall.
+
+This explicit route-table design has an important boundary: it does not provide symmetric Azure Firewall inspection for branch-initiated or inter-hub private traffic involving Spoke 1. Branch traffic enters through `defaultRouteTable`, while Spoke 1 return traffic uses `inspectedRouteTable`; the resulting asymmetric path is dropped by the stateful firewall. Microsoft documents routing intent as the only supported mechanism for inter-hub inspection through security appliances. Use the [upstream routing-intent design](https://github.com/dmauser/azure-virtualwan/tree/main/svh-ri-intra-region) when those flows are required.
 
 ## Architecture
 
@@ -191,11 +194,12 @@ The West US 3 deployment was tested with ICMP and TCP/22 for private paths, plus
 
 | Flow | Result | Notes |
 |---|---|---|
-| Same-hub spoke to spoke | Pass | Works in both hubs through the local firewall path |
-| Spoke to branch | Pass | Works from spokes in both hubs |
-| Branch to spoke | Fail | Asymmetric `defaultRouteTable` and inspected-table paths |
-| Cross-hub spoke to spoke | Fail | Explicit custom routes do not provide supported inter-hub firewall inspection |
-| Spoke internet egress | Pass | Egress observed through each hub's Azure Firewall public IP |
+| Spoke 1 to private destinations | Route configured | RFC 1918 routes use the local Azure Firewall through `inspectedRouteTable` |
+| Spoke 2 to branch/on-premises | Route configured | Learned private routes use `defaultRouteTable` and bypass Azure Firewall in both hubs |
+| Spoke 2 internet egress | Direct internet access observed | `enableInternetSecurity` is enabled, but the validated deployment did not steer this traffic through Azure Firewall while associated with `defaultRouteTable` |
+| Spoke 2 to Spoke 1 | Asymmetric | Spoke 2 originates through `defaultRouteTable`; Spoke 1 returns through `inspectedRouteTable` |
+| Branch to Spoke 1 | Fail | Asymmetric `defaultRouteTable` and inspected-table paths |
+| Cross-hub inspected traffic | Unsupported | Explicit custom routes do not provide supported inter-hub firewall inspection |
 | Branch internet egress | Pass | DNS and HTTPS egress succeeded |
 
 For comparison, see [Virtual WAN routing policies](https://learn.microsoft.com/azure/virtual-wan/how-to-routing-policies) for the routing-intent design used for symmetric branch and inter-hub inspection. That feature is not deployed by this lab.
