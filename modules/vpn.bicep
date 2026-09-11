@@ -134,6 +134,7 @@ resource hub1BranchConn 'Microsoft.Network/vpnGateways/vpnConnections@2023-11-01
         labels: [
           'Default'
           'internet-only'
+          'spoke-routing'
         ]
         ids: [
           {
@@ -174,6 +175,7 @@ resource hub2BranchConn 'Microsoft.Network/vpnGateways/vpnConnections@2023-11-01
         labels: [
           'Default'
           'internet-only'
+          'spoke-routing'
         ]
         ids: [
           {

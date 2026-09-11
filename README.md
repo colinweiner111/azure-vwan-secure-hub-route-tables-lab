@@ -12,30 +12,33 @@ The deployment creates these custom virtual hub route tables:
 
 | Hub | Custom route table | Static routes | Next hop |
 |---|---|---|---|
-| Hub 1 | `inspectedRouteTable` | RFC 1918 prefixes and `0.0.0.0/0` | Hub 1 Azure Firewall |
+| Hub 1 | `inspectedRouteTable` | `172.16.1.0/24`, `172.16.2.0/24`, and `0.0.0.0/0` | Hub 1 Azure Firewall |
 | Hub 1 | `internetOnlyRouteTable` | `0.0.0.0/0` | Hub 1 Azure Firewall |
 | Hub 1 | `privateOnlyRouteTable` | RFC 1918 prefixes only | Hub 1 Azure Firewall |
-| Hub 2 | `inspectedRouteTable` | RFC 1918 prefixes and `0.0.0.0/0` | Hub 2 Azure Firewall |
+| Hub 2 | `inspectedRouteTable` | `172.16.3.0/24`, `172.16.4.0/24`, and `0.0.0.0/0` | Hub 2 Azure Firewall |
 | Hub 2 | `internetOnlyRouteTable` | `0.0.0.0/0` | Hub 2 Azure Firewall |
 
 Both hubs also use their Azure-provided `defaultRouteTable`; the template references these built-in tables rather than creating them.
 
 | Connection | Associated route table | Propagates to | Internet security |
 |---|---|---|---|
-| Spoke 1 VNets | `inspectedRouteTable` | `defaultRouteTable` and `internet-only` label | Enabled |
-| Spoke 2 VNets | `internetOnlyRouteTable` | `defaultRouteTable` and `internet-only` label | Enabled |
-| Branch VPN | `defaultRouteTable` | `defaultRouteTable` and `internet-only` label | Enabled |
+| Spoke 1 and Spoke 2 VNets | Local `inspectedRouteTable` | `Default`, `spoke-routing`, and `internet-only` labels; explicit local Default ID | Enabled |
+| Branch VPN | `defaultRouteTable` | `Default`, `spoke-routing`, and `internet-only` labels; explicit local Default ID | Enabled |
 | Bastion VNet | `privateOnlyRouteTable` in Hub 1 | `defaultRouteTable` | Disabled |
 
-Azure requires branch VPN connections to associate with the built-in `defaultRouteTable`; custom route-table association is supported for VNet connections but not branches. Spoke 2 in each hub associates with `internetOnlyRouteTable`. The VPN and VNet connections propagate their learned prefixes to that table through the `internet-only` label, so more-specific private routes bypass Azure Firewall while the static `0.0.0.0/0` route sends internet traffic through the local firewall. Spoke 2-to-Spoke 1 flows can still be asymmetric because Spoke 1 returns private traffic through `inspectedRouteTable`. The Bastion-specific table sends private traffic through Hub 1 Azure Firewall but has no `0.0.0.0/0` route. This preserves Bastion's required direct control-plane internet access. Connected prefixes also propagate to the built-in default route tables.
+Both spokes in each hub associate with the same inspected table. Its static local-spoke routes take precedence over learned routes of the same prefix length, steering same-hub Spoke 1-to-Spoke 2 traffic through the local firewall in both directions. The spoke prefixes are passed from the network module rather than duplicated in the routing module. Internet traffic uses the static `0.0.0.0/0` route to that firewall.
 
-In practical terms, private traffic from either Spoke 2 to the branch/on-premises network bypasses Azure Firewall in both hubs, while Spoke 2 internet traffic follows the default route through the local firewall. Spoke 1 private and internet traffic uses `inspectedRouteTable` and traverses the local hub firewall.
+Both inspected tables also carry the shared `spoke-routing` label. Spoke and VPN connections propagate learned prefixes to both tables through that label. Learned branch prefixes (expected `10.100.0.0/16`) are more specific than the default route and do not match the local-spoke firewall routes, so traffic from either spoke to on-premises is intended to bypass inspection. Branch VPN connections remain associated with the built-in `defaultRouteTable`, which learns direct spoke routes for the reverse path. No firewall-steering spoke routes are added to Default, and no forced private SNAT is configured.
 
-This explicit route-table design has an important boundary: it does not provide symmetric Azure Firewall inspection for branch-initiated or inter-hub private traffic involving Spoke 1. Branch traffic enters through `defaultRouteTable`, while Spoke 1 return traffic uses `inspectedRouteTable`; the resulting asymmetric path is dropped by the stateful firewall. Microsoft documents routing intent as the only supported mechanism for inter-hub inspection through security appliances. Use the [upstream routing-intent design](https://github.com/dmauser/azure-virtualwan/tree/main/svh-ri-intra-region) when those flows are required.
+The previous `internetOnlyRouteTable` resources and their propagation label are retained for compatibility, but no spokes associate with them. The Bastion table and connection remain unchanged: private prefixes target Hub 1 Firewall and there is no default route, preserving direct control-plane internet access. Bastion data-plane connectivity, especially to remote-hub destinations, still requires regression testing.
+
+**Cross-hub inspection remains unresolved.** Learned remote-spoke routes are retained in the inspected tables for direct inter-hub connectivity; this change does not steer those flows through firewalls. That is an interim connectivity path, not satisfaction of the cross-hub inspection requirement. Microsoft documents Routing Intent as the supported mechanism for inter-hub inspection through security appliances inside managed vWAN hubs. Routing Intent remains excluded from this lab; no unsupported SNAT workaround or cross-hub blocking is introduced.
 
 ## Architecture
 
-![Lab Architecture](image/vwan-02-lab-01.svg)
+The diagram below shows the earlier Spoke 2 internet-only checkpoint. Use the routing tables above for the current proposed configuration; the diagram's route associations have not yet been updated.
+
+![Lab Architecture](image/vwan-02-lab-01.svg?v=2)
 
 ## Prerequisites
 
@@ -124,8 +127,8 @@ $vpnSharedKey = ConvertTo-SecureString $env:AZURE_VPN_SHARED_KEY -AsPlainText -F
 - Two spokes per hub
 - Branch site with VPN Gateway (BGP)
 - Azure Firewall (Hub) + Policy per hub
-- Log Analytics Workspaces + diagnostic settings
-- Two custom `inspectedRouteTable` route tables, one Hub 1 `privateOnlyRouteTable`, and explicit connection associations and propagations
+- Log Analytics Workspaces + dedicated resource-specific diagnostic tables for all Azure Firewall log categories and metrics
+- Two custom `inspectedRouteTable` tables, two retained `internetOnlyRouteTable` tables, one Hub 1 `privateOnlyRouteTable`, and explicit connection associations and propagations
 - **Azure Bastion — provides browser-based RDP/SSH access to all VMs (both hubs and branch)**
 - **5 Ubuntu VMs:**
   - branch1-vm (in branch VNet)
@@ -192,25 +195,23 @@ az group delete --subscription <subscription-id> --name <your-rg> --yes --no-wai
 
 ## Validation
 
-The West US 3 deployment was tested with ICMP and TCP/22 for private paths, plus DNS and public-IP checks for internet egress.
+The selective intra-hub configuration has passed local Bicep compilation and compiled-template routing checks. It has **not been deployed or tested live**. Earlier checkpoint tests passed Spoke 2 internet egress and branch connectivity, but private flows involving Spoke 1 failed; those results do not validate this new configuration.
 
-| Flow | Result | Notes |
+| Flow | Target behavior | Validation status |
 |---|---|---|
-| Spoke 1 to private destinations | Route configured | RFC 1918 routes use the local Azure Firewall through `inspectedRouteTable` |
-| Spoke 2 to branch/on-premises | Route configured | Learned private routes in `internetOnlyRouteTable` bypass Azure Firewall in both hubs |
-| Spoke 2 internet egress | Pending redeployment | `0.0.0.0/0` in `internetOnlyRouteTable` targets the local Azure Firewall |
-| Spoke 2 to Spoke 1 | Asymmetric | Spoke 2 uses learned routes when present; Spoke 1 returns through `inspectedRouteTable` |
-| Branch to Spoke 1 | Fail | Asymmetric `defaultRouteTable` and inspected-table paths |
-| Cross-hub inspected traffic | Unsupported | Explicit custom routes do not provide supported inter-hub firewall inspection |
-| Branch internet egress | Pass | DNS and HTTPS egress succeeded |
+| Same-hub Spoke 1 <-> Spoke 2, both hubs | Local firewall in both directions | Pending deployment and live tests |
+| All four spokes <-> branch/on-premises | Bypass firewall in both directions | Pending deployment and live tests |
+| All four spokes to internet | Local firewall egress | Pending deployment and live tests |
+| Cross-hub spoke connectivity | Retain learned direct routes | Pending regression tests; not inspected |
+| Cross-hub firewall inspection | Required but not implemented | Unresolved under the no-Routing-Intent constraint |
+| Bastion to workload VMs | Existing configuration retained | Pending regression tests |
+| Branch internet egress | Existing configuration retained | Passed at earlier checkpoint; pending regression test |
 
-For comparison, see [Virtual WAN routing policies](https://learn.microsoft.com/azure/virtual-wan/how-to-routing-policies) for the routing-intent design used for symmetric branch and inter-hub inspection. That feature is not deployed by this lab.
+After deployment, verify effective routes in both inspected and Default tables: local spoke /24s must select the firewall only in the inspected tables; branch prefixes must select a VPN path; remote spokes must retain inter-hub reachability. More-specific learned routes could override the intended static paths, so template inspection alone is insufficient.
 
-## Credits & Source
+Test TCP/22 in both initiation directions for each same-hub pair and each spoke/branch pair, plus all cross-hub pairs. Correlate test timestamps and addresses with firewall network logs to confirm same-hub inspection; successful connectivity alone does not prove traversal. Confirm branch bypass using effective routes in both directions and log correlation, not just absence of a log entry. For internet, compare each spoke's observed public egress IP with its local firewall's public IP and test DNS/HTTPS. Recheck Bastion access and branch internet access.
 
-This implementation is adapted from Daniel Mauser's [Secured Virtual Hubs and Routing Intent lab](https://github.com/dmauser/azure-virtualwan/tree/main/svh-ri-intra-region).
-
-Huge thanks to **Daniel Mauser** ([@dmauser](https://github.com/dmauser)) and **Jose Moreno** ([@erjosito](https://github.com/erjosito)) for sharing and maintaining these scenarios and guidance.
+See [Virtual WAN routing policies](https://learn.microsoft.com/azure/virtual-wan/how-to-routing-policies) for the documented inter-hub inspection limitation. Routing Intent is not deployed by this lab.
 
 ---
 
