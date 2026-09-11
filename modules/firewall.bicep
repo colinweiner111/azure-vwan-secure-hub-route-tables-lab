@@ -181,17 +181,10 @@ resource hub1FwDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-pre
   name: 'toLogAnalytics'
   properties: {
     workspaceId: hub1LogWorkspace.id
+    logAnalyticsDestinationType: 'Dedicated'
     logs: [
       {
-        category: 'AzureFirewallApplicationRule'
-        enabled: true
-      }
-      {
-        category: 'AzureFirewallNetworkRule'
-        enabled: true
-      }
-      {
-        category: 'AzureFirewallDnsProxy'
+        categoryGroup: 'allLogs'
         enabled: true
       }
     ]
@@ -210,17 +203,10 @@ resource hub2FwDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-pre
   name: 'toLogAnalytics'
   properties: {
     workspaceId: hub2LogWorkspace.id
+    logAnalyticsDestinationType: 'Dedicated'
     logs: [
       {
-        category: 'AzureFirewallApplicationRule'
-        enabled: true
-      }
-      {
-        category: 'AzureFirewallNetworkRule'
-        enabled: true
-      }
-      {
-        category: 'AzureFirewallDnsProxy'
+        categoryGroup: 'allLogs'
         enabled: true
       }
     ]
