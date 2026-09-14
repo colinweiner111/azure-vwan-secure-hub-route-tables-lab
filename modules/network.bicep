@@ -227,5 +227,7 @@ output spoke1Hub1Id string = spoke1Hub1.id
 output spoke2Hub1Id string = spoke2Hub1.id
 output spoke1Hub2Id string = spoke1Hub2.id
 output spoke2Hub2Id string = spoke2Hub2.id
+output spoke1Hub1Prefixes array = spoke1Hub1.properties.addressSpace.addressPrefixes
+output spoke1Hub2Prefixes array = spoke1Hub2.properties.addressSpace.addressPrefixes
 output nsgHub1Id string = nsgHub1.id
 output nsgHub2Id string = nsgHub2.id

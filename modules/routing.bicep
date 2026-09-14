@@ -6,6 +6,8 @@ param spoke1Hub1Id string
 param spoke2Hub1Id string
 param spoke1Hub2Id string
 param spoke2Hub2Id string
+param spoke1Hub1Prefixes array
+param spoke1Hub2Prefixes array
 
 resource hub1 'Microsoft.Network/virtualHubs@2023-11-01' existing = {
   name: hub1Name
@@ -15,14 +17,42 @@ resource hub2 'Microsoft.Network/virtualHubs@2023-11-01' existing = {
   name: hub2Name
 }
 
-resource hub1DefaultRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2023-11-01' existing = {
+resource hub1DefaultRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2023-11-01' = {
   parent: hub1
   name: 'defaultRouteTable'
+  properties: {
+    labels: [
+      'default'
+    ]
+    routes: [
+      {
+        name: 'LocalSpoke1ToFirewall'
+        destinationType: 'CIDR'
+        destinations: spoke1Hub1Prefixes
+        nextHopType: 'ResourceId'
+        nextHop: hub1FirewallId
+      }
+    ]
+  }
 }
 
-resource hub2DefaultRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2023-11-01' existing = {
+resource hub2DefaultRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2023-11-01' = {
   parent: hub2
   name: 'defaultRouteTable'
+  properties: {
+    labels: [
+      'default'
+    ]
+    routes: [
+      {
+        name: 'LocalSpoke1ToFirewall'
+        destinationType: 'CIDR'
+        destinations: spoke1Hub2Prefixes
+        nextHopType: 'ResourceId'
+        nextHop: hub2FirewallId
+      }
+    ]
+  }
 }
 
 resource hub1InspectedRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2023-11-01' = {
@@ -89,6 +119,62 @@ resource hub2InspectedRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2
   }
 }
 
+resource hub1InternetOnlyRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2023-11-01' = {
+  parent: hub1
+  name: 'internetOnlyRouteTable'
+  properties: {
+    labels: [
+      'internet-only'
+    ]
+    routes: [
+      {
+        name: 'LocalSpoke1ToFirewall'
+        destinationType: 'CIDR'
+        destinations: spoke1Hub1Prefixes
+        nextHopType: 'ResourceId'
+        nextHop: hub1FirewallId
+      }
+      {
+        name: 'InternetTrafficToFirewall'
+        destinationType: 'CIDR'
+        destinations: [
+          '0.0.0.0/0'
+        ]
+        nextHopType: 'ResourceId'
+        nextHop: hub1FirewallId
+      }
+    ]
+  }
+}
+
+resource hub2InternetOnlyRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2023-11-01' = {
+  parent: hub2
+  name: 'internetOnlyRouteTable'
+  properties: {
+    labels: [
+      'internet-only'
+    ]
+    routes: [
+      {
+        name: 'LocalSpoke1ToFirewall'
+        destinationType: 'CIDR'
+        destinations: spoke1Hub2Prefixes
+        nextHopType: 'ResourceId'
+        nextHop: hub2FirewallId
+      }
+      {
+        name: 'InternetTrafficToFirewall'
+        destinationType: 'CIDR'
+        destinations: [
+          '0.0.0.0/0'
+        ]
+        nextHopType: 'ResourceId'
+        nextHop: hub2FirewallId
+      }
+    ]
+  }
+}
+
 resource hub1PrivateRouteTable 'Microsoft.Network/virtualHubs/hubRouteTables@2023-11-01' = {
   parent: hub1
   name: 'privateOnlyRouteTable'
@@ -127,6 +213,7 @@ resource hub1Spoke1Connection 'Microsoft.Network/virtualHubs/hubVirtualNetworkCo
       propagatedRouteTables: {
         labels: [
           'Default'
+          'internet-only'
         ]
         ids: [
           {
@@ -148,11 +235,12 @@ resource hub1Spoke2Connection 'Microsoft.Network/virtualHubs/hubVirtualNetworkCo
     enableInternetSecurity: true
     routingConfiguration: {
       associatedRouteTable: {
-        id: hub1InspectedRouteTable.id
+        id: hub1InternetOnlyRouteTable.id
       }
       propagatedRouteTables: {
         labels: [
           'Default'
+          'internet-only'
         ]
         ids: [
           {
@@ -179,6 +267,7 @@ resource hub2Spoke1Connection 'Microsoft.Network/virtualHubs/hubVirtualNetworkCo
       propagatedRouteTables: {
         labels: [
           'Default'
+          'internet-only'
         ]
         ids: [
           {
@@ -200,11 +289,12 @@ resource hub2Spoke2Connection 'Microsoft.Network/virtualHubs/hubVirtualNetworkCo
     enableInternetSecurity: true
     routingConfiguration: {
       associatedRouteTable: {
-        id: hub2InspectedRouteTable.id
+        id: hub2InternetOnlyRouteTable.id
       }
       propagatedRouteTables: {
         labels: [
           'Default'
+          'internet-only'
         ]
         ids: [
           {
@@ -218,6 +308,8 @@ resource hub2Spoke2Connection 'Microsoft.Network/virtualHubs/hubVirtualNetworkCo
 
 output hub1InspectedRouteTableId string = hub1InspectedRouteTable.id
 output hub2InspectedRouteTableId string = hub2InspectedRouteTable.id
+output hub1InternetOnlyRouteTableId string = hub1InternetOnlyRouteTable.id
+output hub2InternetOnlyRouteTableId string = hub2InternetOnlyRouteTable.id
 output hub1PrivateRouteTableId string = hub1PrivateRouteTable.id
 output hub1DefaultRouteTableId string = hub1DefaultRouteTable.id
 output hub2DefaultRouteTableId string = hub2DefaultRouteTable.id

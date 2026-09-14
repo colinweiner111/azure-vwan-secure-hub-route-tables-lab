@@ -133,6 +133,7 @@ resource hub1BranchConn 'Microsoft.Network/vpnGateways/vpnConnections@2023-11-01
       propagatedRouteTables: {
         labels: [
           'Default'
+          'internet-only'
         ]
         ids: [
           {
@@ -172,6 +173,7 @@ resource hub2BranchConn 'Microsoft.Network/vpnGateways/vpnConnections@2023-11-01
       propagatedRouteTables: {
         labels: [
           'Default'
+          'internet-only'
         ]
         ids: [
           {

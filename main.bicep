@@ -100,6 +100,8 @@ module routing 'modules/routing.bicep' = {
     hub2Name: hub2Name
     hub1FirewallId: firewall.outputs.hub1FirewallId
     hub2FirewallId: firewall.outputs.hub2FirewallId
+    spoke1Hub1Prefixes: network.outputs.spoke1Hub1Prefixes
+    spoke1Hub2Prefixes: network.outputs.spoke1Hub2Prefixes
     spoke1Hub1Id: network.outputs.spoke1Hub1Id
     spoke2Hub1Id: network.outputs.spoke2Hub1Id
     spoke1Hub2Id: network.outputs.spoke1Hub2Id
